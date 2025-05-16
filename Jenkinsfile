@@ -1,12 +1,18 @@
+@Library('my_ocp_sharelib') _  
+import com.aviro.OpenShiftHelper  
+
 pipeline {
     agent {
         label 'builder4'
     }
  
     environment {
-        sonarqube_token = credentials('sonar-secret-id')
-        IMAGE_NAME = "mandingoking2023/simple-java-maven-app"
-        IMAGE_TAG = "latest"
+        OC_TOKEN = credentials('kingopenshift-id')  // Jenkins credentials
+        OC_SERVER = "https://api.rm1.0a51.p1.openshiftapps.com:6443"
+        PROJECT = "kekuda-king-dev"
+        IMAGE_NAME = "molacon/paas:latest"
+        APP_NAME = "web-terminal-tooling"
+        APP_DEPLOYMENT = "workspace62e89aa8716c4c83"
     }
    
     tools {
@@ -21,9 +27,11 @@ pipeline {
             }
         }
        
-        stage('Build') {
+        stage('Login to OpenShift') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                script {
+                    OpenShiftHelper.login(this, OC_TOKEN, OC_SERVER)
+                }
             }
         }
        
@@ -41,9 +49,9 @@ pipeline {
             }
         }
  
-        stage('sudo Build Docker Image') {
+        stage('Connect to open shift') {
             steps {
-                    sh 'sudo docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
+                    sh "oc project ${project}"
             }
         }
  
@@ -59,7 +67,7 @@ pipeline {
                                             --format template \
                                             --template "@/contrib/html.tpl" \
                                             -o /root/reports/trivy-report.html \
-                                            ${IMAGE_NAME}:${IMAGE_TAG}
+                                            ${IMAGE_NAME}
                                             '''
  
                                         }
@@ -84,20 +92,20 @@ pipeline {
                                     }
  
         //  Optional: Push Docker image to a registry
-        stage('sudo Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-image-id',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | sudo docker login -u "$DOCKER_USER" --password-stdin
-                        sudo docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    '''
-                }
-            }
-        }
+        // stage('sudo Push Docker Image') {
+        //     steps {
+        //         withCredentials([usernamePassword(
+        //             credentialsId: 'docker-image-id',
+        //             usernameVariable: 'DOCKER_USER',
+        //             passwordVariable: 'DOCKER_PASS'
+        //         )]) {
+        //             sh '''
+        //                 echo "$DOCKER_PASS" | sudo docker login -u "$DOCKER_USER" --password-stdin
+        //                 sudo docker push ${IMAGE_NAME}:${IMAGE_TAG}
+        //             '''
+        //         }
+        //     }
+        // }
  
         // stage('Deploy Docker Image') {
         //     steps {
@@ -106,13 +114,13 @@ pipeline {
         // }
  
  
-        // stage('Build Docker Image') {
-        //     steps {
-        //         script {
-        //             docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-        //         }
-        //     }
-        // }
+        stage('Push to openshift') {
+            steps {
+                script {
+                    sh "oc new-app ${IMAGE_NAME} -name=${APP_NAME} --namespace=${PROJECT}"
+                }
+            }
+        }
        
         // The good things at the end
         // stage('Quality Gate') {
