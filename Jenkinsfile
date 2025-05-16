@@ -8,6 +8,7 @@ pipeline {
  
     environment {
         OC_TOKEN = credentials('kingopenshift-id')  // Jenkins credentials
+        sonarqube_token = credentials('sonar-secret-id')
         OC_SERVER = "https://api.rm1.0a51.p1.openshiftapps.com:6443"
         PROJECT = "kekuda-king-dev"
         IMAGE_NAME = "molacon/paas:latest"
